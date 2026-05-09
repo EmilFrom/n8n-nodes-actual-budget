@@ -27,20 +27,14 @@ type ActualCategory = {
 	hidden?: boolean;
 };
 
-type ActualCategoryGroup = {
-	name: string;
-	hidden?: boolean;
-	categories?: ActualCategory[];
+/** Single-transaction create (official POST body). */
+const showForTransactionCreate = {
+	action: ['transactionCreate'],
 };
 
-type ActualPayee = {
-	id: string;
-	name: string;
-};
-
-const showForImportTransaction = {
-	resource: ['transaction'],
-	operation: ['import'],
+/** GET /months/{month} */
+const showForBudgetGet = {
+	action: ['budgetGet'],
 };
 
 function parseActualDate(value: string) {
@@ -59,13 +53,21 @@ function parseActualDate(value: string) {
 	return parsedDate.toISOString().slice(0, 10);
 }
 
-function decimalToActualAmount(value: number, transactionType: string) {
-	if (!Number.isFinite(value) || value <= 0) {
-		throw new ApplicationError('Amount must be a positive number');
+function parseMinorUnitsAmount(value: number) {
+	if (!Number.isFinite(value)) {
+		throw new ApplicationError(
+			'Amount must be an integer in minor currency units (e.g. -7374 for -73.74)',
+		);
 	}
 
-	const unsignedAmount = Math.round(value * 100);
-	return transactionType === 'expense' ? -unsignedAmount : unsignedAmount;
+	const rounded = Math.round(value);
+	if (Math.abs(value - rounded) > 1e-9) {
+		throw new ApplicationError(
+			'Amount must be an integer in minor currency units (e.g. -7374 for -73.74)',
+		);
+	}
+
+	return rounded;
 }
 
 function filterResults<T extends { name: string }>(items: T[], filter?: string) {
@@ -83,9 +85,10 @@ export class ActualBudget implements INodeType {
 		name: 'actualBudget',
 		icon: { light: 'file:actual-budget.svg', dark: 'file:actual-budget.dark.svg' },
 		group: ['input'],
-		version: 1,
-		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Import income and expenses into Actual Budget via actual-http-api',
+		version: 2,
+		subtitle: '={{$parameter["action"]}}',
+		description:
+			'Read budgets and create transactions in Actual Budget via actual-http-api (official endpoints)',
 		defaults: {
 			name: 'Actual Budget',
 		},
@@ -100,37 +103,37 @@ export class ActualBudget implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'Resource',
-				name: 'resource',
+				displayName: 'Action',
+				name: 'action',
 				type: 'options',
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Transaction',
-						value: 'transaction',
+						name: 'Account: List',
+						value: 'accountList',
+						action: 'List accounts',
+						description: 'GET /accounts',
 					},
-				],
-				default: 'transaction',
-			},
-			{
-				displayName: 'Operation',
-				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				displayOptions: {
-					show: {
-						resource: ['transaction'],
-					},
-				},
-				options: [
 					{
-						name: 'Import Expense/Income',
-						value: 'import',
-						action: 'Import an income or expense transaction',
-						description: 'Import one transaction using Actual import dedupe behavior',
+						name: 'Budget: Get Month',
+						value: 'budgetGet',
+						action: 'Get budget month',
+						description: 'GET /months/{month}',
+					},
+					{
+						name: 'Category: List',
+						value: 'categoryList',
+						action: 'List categories',
+						description: 'GET /categories',
+					},
+					{
+						name: 'Transaction: Create',
+						value: 'transactionCreate',
+						action: 'Create a transaction',
+						description: 'POST /accounts/{ID}/transactions',
 					},
 				],
-				default: 'import',
+				default: 'transactionCreate',
 			},
 			{
 				displayName: 'Account',
@@ -139,7 +142,7 @@ export class ActualBudget implements INodeType {
 				default: { mode: 'list', value: '' },
 				required: true,
 				displayOptions: {
-					show: showForImportTransaction,
+					show: showForTransactionCreate,
 				},
 				modes: [
 					{
@@ -160,94 +163,7 @@ export class ActualBudget implements INodeType {
 						placeholder: 'e.g. 729cb492-4eab-468b-9522-75d455cded22',
 					},
 				],
-				description: 'Actual account to import the transaction into',
-			},
-			{
-				displayName: 'Transaction Type',
-				name: 'transactionType',
-				type: 'options',
-				displayOptions: {
-					show: showForImportTransaction,
-				},
-				options: [
-					{
-						name: 'Expense',
-						value: 'expense',
-					},
-					{
-						name: 'Income',
-						value: 'income',
-					},
-				],
-				default: 'expense',
-				description: 'Whether the positive amount should be imported as money out or money in',
-			},
-			{
-				displayName: 'Amount',
-				name: 'amount',
-				type: 'number',
-				required: true,
-				displayOptions: {
-					show: showForImportTransaction,
-				},
-				typeOptions: {
-					minValue: 0,
-					numberPrecision: 2,
-				},
-				default: 0,
-				description: 'Positive decimal amount, for example 12.34',
-			},
-			{
-				displayName: 'Date',
-				name: 'date',
-				type: 'dateTime',
-				required: true,
-				displayOptions: {
-					show: showForImportTransaction,
-				},
-				default: '',
-				description: 'Transaction date. Actual stores transactions by date, so time is ignored.',
-			},
-			{
-				displayName: 'Transaction UUID',
-				name: 'transactionUuid',
-				type: 'string',
-				required: true,
-				displayOptions: {
-					show: showForImportTransaction,
-				},
-				default: '',
-				description: 'Stable transaction identifier to send as imported_id for dedupe/upsert behavior',
-			},
-			{
-				displayName: 'Payee',
-				name: 'payeeName',
-				type: 'resourceLocator',
-				default: { mode: 'list', value: '' },
-				required: true,
-				displayOptions: {
-					show: showForImportTransaction,
-				},
-				modes: [
-					{
-						displayName: 'Payee',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select a payee...',
-						typeOptions: {
-							searchListMethod: 'getPayees',
-							searchable: true,
-							searchFilterRequired: false,
-						},
-					},
-					{
-						displayName: 'By Name',
-						name: 'name',
-						type: 'string',
-						placeholder: 'e.g. Grocery Store',
-					},
-				],
-				description: 'Existing payee to use, or a payee name for Actual to match/create',
+				description: 'Account for the transaction',
 			},
 			{
 				displayName: 'Category',
@@ -256,7 +172,7 @@ export class ActualBudget implements INodeType {
 				default: { mode: 'list', value: '' },
 				required: true,
 				displayOptions: {
-					show: showForImportTransaction,
+					show: showForTransactionCreate,
 				},
 				modes: [
 					{
@@ -277,69 +193,86 @@ export class ActualBudget implements INodeType {
 						placeholder: 'e.g. 9fa2550c-c3ff-498b-8df6-e0fbe2a62e0e',
 					},
 				],
-				description: 'Actual category for the transaction',
+				description: 'Category ID for the transaction',
 			},
 			{
-				displayName: 'Additional Fields',
-				name: 'additionalFields',
-				type: 'collection',
-				placeholder: 'Add Field',
-				default: {},
+				displayName: 'Amount',
+				name: 'amount',
+				type: 'number',
+				required: true,
 				displayOptions: {
-					show: showForImportTransaction,
+					show: showForTransactionCreate,
 				},
-				options: [
-					{
-						displayName: 'Cleared',
-						name: 'cleared',
-						type: 'boolean',
-						default: true,
-						description: 'Whether this transaction should be marked as cleared',
-					},
-					{
-						displayName: 'Notes',
-						name: 'notes',
-						type: 'string',
-						typeOptions: {
-							rows: 3,
-						},
-						default: '',
-						description: 'Optional transaction notes',
-					},
-				],
+				typeOptions: {
+					numberPrecision: 0,
+				},
+				default: 0,
+				description: 'Integer minor units (see actual-http-api docs). Example: expense -7374 means -73.74.',
 			},
 			{
-				displayName: 'Import Options',
-				name: 'importOptions',
-				type: 'collection',
-				placeholder: 'Add Option',
-				default: {},
+				displayName: 'Date',
+				name: 'date',
+				type: 'dateTime',
+				required: true,
 				displayOptions: {
-					show: showForImportTransaction,
+					show: showForTransactionCreate,
 				},
-				options: [
-					{
-						displayName: 'Default Cleared',
-						name: 'defaultCleared',
-						type: 'boolean',
-						default: true,
-						description: 'Whether imported transactions should default to cleared',
-					},
-					{
-						displayName: 'Dry Run',
-						name: 'dryRun',
-						type: 'boolean',
-						default: false,
-						description: 'Whether to preview import results without changing the budget',
-					},
-					{
-						displayName: 'Reimport Deleted',
-						name: 'reimportDeleted',
-						type: 'boolean',
-						default: false,
-						description: 'Whether to reimport transactions previously deleted in Actual',
-					},
-				],
+				default: '',
+				description: 'Transaction date (YYYY-MM-DD); time is ignored',
+			},
+			{
+				displayName: 'Payee Name',
+				name: 'payeeName',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: showForTransactionCreate,
+				},
+				default: '',
+				placeholder: 'e.g. Amazon',
+				description: 'Payee label for the transaction',
+			},
+			{
+				displayName: 'Cleared',
+				name: 'cleared',
+				type: 'boolean',
+				displayOptions: {
+					show: showForTransactionCreate,
+				},
+				default: false,
+				description: 'Whether the transaction is cleared',
+			},
+			{
+				displayName: 'Learn Categories',
+				name: 'learnCategories',
+				type: 'boolean',
+				displayOptions: {
+					show: showForTransactionCreate,
+				},
+				default: false,
+				description: 'Whether to pass learnCategories to actual-http-api',
+			},
+			{
+				displayName: 'Run Transfers',
+				name: 'runTransfers',
+				type: 'boolean',
+				displayOptions: {
+					show: showForTransactionCreate,
+				},
+				default: false,
+				description: 'Whether to pass runTransfers to actual-http-api',
+			},
+			{
+				displayName: 'Month',
+				name: 'month',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: showForBudgetGet,
+				},
+				default: '',
+				placeholder: '2026-05',
+				description: 'Budget month in YYYY-MM format',
 			},
 		],
 	};
@@ -348,7 +281,6 @@ export class ActualBudget implements INodeType {
 		listSearch: {
 			getAccounts,
 			getCategories,
-			getPayees,
 		},
 	};
 
@@ -358,72 +290,95 @@ export class ActualBudget implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
-				const accountId = this.getNodeParameter('accountId', itemIndex, '', {
-					extractValue: true,
-				}) as string;
-				const categoryId = this.getNodeParameter('categoryId', itemIndex, '', {
-					extractValue: true,
-				}) as string;
-				const payeeName = this.getNodeParameter('payeeName', itemIndex, '', {
-					extractValue: true,
-				}) as string;
-				const transactionType = this.getNodeParameter(
-					'transactionType',
-					itemIndex,
-				) as string;
-				const amount = this.getNodeParameter('amount', itemIndex) as number;
-				const date = this.getNodeParameter('date', itemIndex) as string;
-				const transactionUuid = this.getNodeParameter(
-					'transactionUuid',
-					itemIndex,
-				) as string;
-				const additionalFields = this.getNodeParameter(
-					'additionalFields',
-					itemIndex,
-					{},
-				) as IDataObject;
-				const importOptions = this.getNodeParameter(
-					'importOptions',
-					itemIndex,
-					{},
-				) as IDataObject;
+				const action = this.getNodeParameter('action', itemIndex) as string;
 
-				const transaction: IDataObject = {
-					account: accountId,
-					amount: decimalToActualAmount(amount, transactionType),
-					category: categoryId,
-					date: parseActualDate(date),
-					imported_id: transactionUuid,
-					payee_name: payeeName,
-				};
+				if (action === 'transactionCreate') {
+					const accountId = this.getNodeParameter('accountId', itemIndex, '', {
+						extractValue: true,
+					}) as string;
+					const categoryId = this.getNodeParameter('categoryId', itemIndex, '', {
+						extractValue: true,
+					}) as string;
+					const amount = parseMinorUnitsAmount(this.getNodeParameter('amount', itemIndex) as number);
+					const date = this.getNodeParameter('date', itemIndex) as string;
+					const payeeName = this.getNodeParameter('payeeName', itemIndex) as string;
+					const cleared = this.getNodeParameter('cleared', itemIndex, false) as boolean;
+					const learnCategories = this.getNodeParameter(
+						'learnCategories',
+						itemIndex,
+						false,
+					) as boolean;
+					const runTransfers = this.getNodeParameter('runTransfers', itemIndex, false) as boolean;
 
-				if (additionalFields.notes) {
-					transaction.notes = additionalFields.notes;
+					const body: IDataObject = {
+						learnCategories,
+						runTransfers,
+						transaction: {
+							account: accountId,
+							category: categoryId,
+							amount,
+							payee_name: payeeName,
+							date: parseActualDate(date),
+							cleared,
+						},
+					};
+
+					const responseData = (await actualApiRequest.call(
+						this,
+						'POST',
+						`/accounts/${encodeURIComponent(accountId)}/transactions`,
+						body,
+					)) as IDataObject;
+
+					returnData.push({
+						json: {
+							...responseData,
+							request: body,
+						},
+						pairedItem: itemIndex,
+					});
+					continue;
 				}
 
-				if (additionalFields.cleared !== undefined) {
-					transaction.cleared = additionalFields.cleared;
+				if (action === 'budgetGet') {
+					const month = this.getNodeParameter('month', itemIndex) as string;
+					const trimmed = month.trim();
+					if (!/^\d{4}-\d{2}$/.test(trimmed)) {
+						throw new ApplicationError('Month must be in YYYY-MM format');
+					}
+
+					const response = (await actualApiRequest.call(
+						this,
+						'GET',
+						`/months/${encodeURIComponent(trimmed)}`,
+					)) as IDataObject;
+
+					returnData.push({
+						json: response as IDataObject,
+						pairedItem: itemIndex,
+					});
+					continue;
 				}
 
-				const responseData = (await actualApiRequest.call(
-					this,
-					'POST',
-					`/accounts/${encodeURIComponent(accountId)}/transactions/import`,
-					{
-						transactions: [transaction],
-						defaultCleared: importOptions.defaultCleared ?? true,
-						dryRun: importOptions.dryRun ?? false,
-						reimportDeleted: importOptions.reimportDeleted ?? false,
-					},
-				)) as IDataObject;
+				if (action === 'accountList') {
+					const response = (await actualApiRequest.call(this, 'GET', '/accounts')) as IDataObject;
+					returnData.push({
+						json: response as IDataObject,
+						pairedItem: itemIndex,
+					});
+					continue;
+				}
 
-				returnData.push({
-					json: {
-						...responseData,
-						transaction,
-					},
-					pairedItem: itemIndex,
-				});
+				if (action === 'categoryList') {
+					const response = (await actualApiRequest.call(this, 'GET', '/categories')) as IDataObject;
+					returnData.push({
+						json: response as IDataObject,
+						pairedItem: itemIndex,
+					});
+					continue;
+				}
+
+				throw new ApplicationError(`Unsupported action: ${action}`);
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({
@@ -466,46 +421,14 @@ async function getCategories(
 	this: ILoadOptionsFunctions,
 	filter?: string,
 ): Promise<INodeListSearchResult> {
-	const response = (await actualApiRequest.call(
-		this,
-		'GET',
-		'/categorygroups',
-	)) as ActualListResponse<ActualCategoryGroup>;
-	const results: INodeListSearchItems[] = [];
-
-	for (const group of response.data ?? []) {
-		if (group.hidden) {
-			continue;
-		}
-
-		for (const category of group.categories ?? []) {
-			if (category.hidden) {
-				continue;
-			}
-
-			results.push({
-				name: `${group.name} / ${category.name}`,
-				value: category.id,
-			});
-		}
-	}
-
-	return { results: filterResults(results, filter) };
-}
-
-async function getPayees(
-	this: ILoadOptionsFunctions,
-	filter?: string,
-): Promise<INodeListSearchResult> {
-	const response = (await actualApiRequest.call(this, 'GET', '/payees')) as ActualListResponse<
-		ActualPayee
+	const response = (await actualApiRequest.call(this, 'GET', '/categories')) as ActualListResponse<
+		ActualCategory
 	>;
-	const payees = filterResults(response.data ?? [], filter);
-
-	const results: INodeListSearchItems[] = payees.map((payee) => ({
-		name: payee.name,
-		value: payee.name,
+	const visible = (response.data ?? []).filter((c) => !c.hidden);
+	const results: INodeListSearchItems[] = visible.map((category) => ({
+		name: category.name,
+		value: category.id,
 	}));
 
-	return { results };
+	return { results: filterResults(results, filter) };
 }

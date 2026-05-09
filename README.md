@@ -1,8 +1,7 @@
 # @emilfrom/n8n-nodes-actual-budget
 
-This is an n8n community node for importing income and expenses into
-[Actual Budget](https://actualbudget.org/) through
-[actual-http-api](https://github.com/jhonderson/actual-http-api).
+This is an n8n community node for working with [Actual Budget](https://actualbudget.org/)
+through [actual-http-api](https://github.com/jhonderson/actual-http-api).
 
 [n8n](https://n8n.io/) is a workflow automation platform.
 
@@ -51,39 +50,44 @@ Create an `Actual HTTP API` credential in n8n with:
 
 The credential test calls `GET /budgets/{budgetSyncId}/accounts`.
 
-## Operations
+## Node version 2 (breaking change)
 
-### Transaction: Import Expense/Income
+Version **2** of the **Actual Budget** node removes the old **Import** operation (which used
+`POST .../transactions/import` and `imported_id` dedupe). Workflows must use **Transaction: Create**
+and amounts as **integer minor units**, matching the [actual-http-api](https://github.com/jhonderson/actual-http-api)
+contract (`value * 100` for most currencies).
 
-Imports one transaction per incoming n8n item using Actual's transaction import
-endpoint. This operation is idempotent when the same transaction UUID is reused,
-because the UUID is sent as `imported_id`.
+## Actions
 
-Required fields:
+Pick an **Action** on the node:
 
-- `Account`: Actual account ID, selectable from actual-http-api
-- `Transaction Type`: `Expense` or `Income`
-- `Amount`: Positive decimal amount, for example `12.34`
-- `Date`: Transaction date or date-time. Actual stores the date only.
-- `Transaction UUID`: Stable unique identifier for dedupe/upsert behavior
-- `Payee`: Existing payee from the dropdown or a payee name
-- `Category`: Actual category ID, selectable from actual-http-api
+### Transaction: Create
 
-Optional fields:
+Creates one transaction per input item using the official single-create endpoint:
 
-- `Notes`
-- `Cleared`
-- `Default Cleared`
-- `Dry Run`
-- `Reimport Deleted`
+`POST /budgets/{budgetSyncId}/accounts/{accountId}/transactions`
 
-## Amounts
+Request body matches the API: `learnCategories`, `runTransfers`, and `transaction` with
+`account`, `category`, `amount`, `payee_name`, `date`, `cleared` only.
 
-Enter positive decimal amounts. The node converts them to Actual's integer amount
-format:
+- **Account** / **Category**: selectable lists from `GET /accounts` and `GET /categories`
+- **Amount**: integer minor units (for example `-7374` for `-73.74` in a two-decimal currency)
+- **Date**: stored as `YYYY-MM-DD`
+- **Payee Name**: plain text (for example `Amazon`)
+- **Cleared**, **Learn Categories**, **Run Transfers**: booleans
 
-- Expense `12.34` becomes `-1234`
-- Income `12.34` becomes `1234`
+### Budget: Get Month
+
+`GET /budgets/{budgetSyncId}/months/{month}` — pass **Month** as `YYYY-MM`. Output includes the API
+`data` payload (totals, category groups, etc.).
+
+### Account: List
+
+`GET /budgets/{budgetSyncId}/accounts` — returns the API response (including `data`).
+
+### Category: List
+
+`GET /budgets/{budgetSyncId}/categories` — returns the API response (including `data`).
 
 ## Development
 
