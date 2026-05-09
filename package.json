@@ -1,6 +1,6 @@
 {
 	"name": "@emilfrom/n8n-nodes-actual-budget",
-	"version": "1.0.0-4",
+	"version": "1.0.0",
 	"description": "personal project for keeping track of my expenses. Thank you to jhonderson for the actual-http-api and Actual Budget for the software. Thank you Jan Oberhauser for the incredible n8n project.",
 	"license": "MIT",
 	"homepage": "https://github.com/emilfrom/n8n-nodes-actual-budget",
