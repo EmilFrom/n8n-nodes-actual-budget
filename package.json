@@ -1,19 +1,23 @@
 {
-	"name": "n8n-nodes-<...>",
+	"name": "@emilfrom/n8n-nodes-actual-budget",
 	"version": "0.1.0",
-	"description": "",
+	"description": "n8n community node for importing income and expenses into Actual Budget via actual-http-api",
 	"license": "MIT",
-	"homepage": "",
+	"homepage": "https://github.com/emilfrom/n8n-nodes-actual-budget",
 	"keywords": [
-		"n8n-community-node-package"
+		"n8n-community-node-package",
+		"n8n",
+		"actual",
+		"actual-budget",
+		"budgeting"
 	],
 	"author": {
-		"name": "",
-		"email": ""
+		"name": "Emil Halkjær From",
+		"email": "npm@emilfrom.com"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/<...>/n8n-nodes-<...>.git"
+		"url": "https://github.com/emilfrom/n8n-nodes-actual-budget"
 	},
 	"scripts": {
 		"build": "n8n-node build",
@@ -31,12 +35,10 @@
 		"n8nNodesApiVersion": 1,
 		"strict": true,
 		"credentials": [
-			"dist/credentials/GithubIssuesApi.credentials.js",
-			"dist/credentials/GithubIssuesOAuth2Api.credentials.js"
+			"dist/credentials/ActualHttpApi.credentials.js"
 		],
 		"nodes": [
-			"dist/nodes/GithubIssues/GithubIssues.node.js",
-			"dist/nodes/Example/Example.node.js"
+			"dist/nodes/ActualBudget/ActualBudget.node.js"
 		]
 	},
 	"devDependencies": {
