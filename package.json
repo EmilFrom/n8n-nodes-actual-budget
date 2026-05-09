@@ -1,7 +1,7 @@
 {
 	"name": "@emilfrom/n8n-nodes-actual-budget",
 	"version": "0.1.0",
-	"description": "n8n community node for importing income and expenses into Actual Budget via actual-http-api",
+	"description": "personal project for keeping track of my expenses. Thank you to jhonderson for the actual-http-api and Actual Budget for the software",
 	"license": "MIT",
 	"homepage": "https://github.com/emilfrom/n8n-nodes-actual-budget",
 	"keywords": [

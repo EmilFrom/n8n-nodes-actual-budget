@@ -1,5 +1,6 @@
 dist
 node_modules
+@emilfrom
 .venv
 .vscode
 .DS_Store
