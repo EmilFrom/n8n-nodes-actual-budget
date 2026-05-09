@@ -3,7 +3,7 @@
 	"version": "1.0.1",
 	"description": "personal project for keeping track of my expenses. Thank you to jhonderson for the actual-http-api and Actual Budget for the software. Thank you Jan Oberhauser for the incredible n8n project.",
 	"license": "MIT",
-	"homepage": "https://github.com/emilfrom/n8n-nodes-actual-budget",
+	"homepage": "https://github.com/EmilFrom/n8n-nodes-actual-budget",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
@@ -17,7 +17,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/emilfrom/n8n-nodes-actual-budget.git"
+		"url": "https://github.com/EmilFrom/n8n-nodes-actual-budget"
 	},
 	"publishConfig": {
 		"access": "public"
