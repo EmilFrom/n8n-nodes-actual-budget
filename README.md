@@ -6,7 +6,8 @@ This is an n8n community node for importing income and expenses into
 
 [n8n](https://n8n.io/) is a workflow automation platform.
 
-personal project for keeping track of my expenses. Thank you to jhonderson for the actual-http-api and Actual Budget for the software. Thank you Jan Oberhauser for the incredible n8n project
+personal project for keeping track of my expenses. Thank you to jhonderson for the actual-http-api and Actual Budget for the software. Thank you Jan Oberhauser for the incredible n8n project.
+This was just for fun but let's see how it goes.
 
 ## Installation
 
