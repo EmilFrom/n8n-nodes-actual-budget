@@ -19,6 +19,9 @@
 		"type": "git",
 		"url": "git+https://github.com/emilfrom/n8n-nodes-actual-budget.git"
 	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"build": "n8n-node build",
 		"build:watch": "tsc --watch",
