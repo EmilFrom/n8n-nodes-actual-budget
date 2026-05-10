@@ -6,9 +6,12 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
-/** Must stay aligned with normalizeActualHttpApiBaseUrl in nodes/ActualBudget/actualHttpApiRoot.ts */
+/**
+ * Must stay aligned with normalizeActualHttpApiBaseUrl in nodes/ActualBudget/actualHttpApiRoot.ts.
+ * Hardened for credential Test: null-safe baseUrl, default host when empty, outer catch → valid URL.
+ */
 const credentialTestBaseUrlExpression =
-	'={{ (() => { const trimmed = $credentials.baseUrl.trim().replace(/\\/+$/, ""); try { const u = new URL(trimmed); let path = u.pathname.replace(/\\/+$/, ""); if (path === "") path = "/"; if (path === "/") { u.pathname = "/v1"; } else if (path.endsWith("/v1")) { u.pathname = path; } else { return trimmed; } return (u.origin + u.pathname).replace(/\\/+$/, ""); } catch { return trimmed; } })() }}';
+	'={{ (() => { try { let raw = ($credentials.baseUrl ?? "").trim().replace(/\\/+$/, ""); if (!raw) raw = "http://localhost:5007"; const trimmed = raw.replace(/\\/+$/, ""); try { const u = new URL(trimmed); let path = u.pathname.replace(/\\/+$/, ""); if (path === "") path = "/"; if (path === "/") { u.pathname = "/v1"; } else if (path.endsWith("/v1")) { u.pathname = path; } else { return trimmed; } return (u.origin + u.pathname).replace(/\\/+$/, ""); } catch { return trimmed; } } catch { return "http://localhost:5007/v1"; } })() }}';
 
 export class ActualHttpApi implements ICredentialType {
 	name = 'actualHttpApi';
