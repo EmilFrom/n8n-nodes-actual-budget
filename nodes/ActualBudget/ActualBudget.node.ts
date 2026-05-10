@@ -27,6 +27,12 @@ type ActualCategory = {
 	hidden?: boolean;
 };
 
+type ActualCategoryGroup = {
+	id: string;
+	name: string;
+	hidden?: boolean;
+};
+
 /** Single-transaction create (official POST body). */
 const showForTransactionCreate = {
 	action: ['transactionCreate'],
@@ -35,6 +41,22 @@ const showForTransactionCreate = {
 /** GET /months/{month} */
 const showForBudgetGet = {
 	action: ['budgetGet'],
+};
+
+/** POST /categories */
+const showForCategoryCreate = {
+	action: ['categoryCreate'],
+};
+
+/** Inline category creation inside Transaction: Create */
+const showForTransactionCategoryExisting = {
+	action: ['transactionCreate'],
+	categorySource: ['existing'],
+};
+
+const showForTransactionCategoryInlineCreate = {
+	action: ['transactionCreate'],
+	categorySource: ['createNew'],
 };
 
 function parseActualDate(value: string) {
@@ -70,6 +92,16 @@ function parseMinorUnitsAmount(value: number) {
 	return rounded;
 }
 
+function parseCreatedCategoryId(response: IDataObject): string {
+	const id = response?.data;
+	if (typeof id === 'string' && id.trim().length > 0) {
+		return id.trim();
+	}
+	throw new ApplicationError(
+		'Create category response did not include a category id in `data` (expected actual-http-api 201 body)',
+	);
+}
+
 function filterResults<T extends { name: string }>(items: T[], filter?: string) {
 	if (!filter) {
 		return items;
@@ -88,7 +120,7 @@ export class ActualBudget implements INodeType {
 		version: 2,
 		subtitle: '={{$parameter["action"]}}',
 		description:
-			'Read budgets and create transactions in Actual Budget via actual-http-api `/v1` routes (official endpoints)',
+			'Read budgets, list/create categories, and create transactions in Actual Budget via actual-http-api `/v1` routes (official endpoints)',
 		defaults: {
 			name: 'Actual Budget',
 		},
@@ -121,6 +153,12 @@ export class ActualBudget implements INodeType {
 						description: 'GET /months/{month}',
 					},
 					{
+						name: 'Category: Create',
+						value: 'categoryCreate',
+						action: 'Create a category',
+						description: 'POST /categories',
+					},
+					{
 						name: 'Category: List',
 						value: 'categoryList',
 						action: 'List categories',
@@ -134,6 +172,31 @@ export class ActualBudget implements INodeType {
 					},
 				],
 				default: 'transactionCreate',
+			},
+			{
+				displayName: 'Category',
+				name: 'categorySource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Create New Category',
+						value: 'createNew',
+						description: 'POST /categories first, then attach the new category to the transaction',
+					},
+					{
+						name: 'Existing Category',
+						value: 'existing',
+						description: 'Pick a category that already exists in the budget',
+					},
+				],
+				default: 'existing',
+				displayOptions: {
+					show: {
+						action: ['transactionCreate'],
+					},
+				},
+				description: 'Whether to use an existing category or create one via the API before posting the transaction',
 			},
 			{
 				displayName: 'Account',
@@ -172,7 +235,7 @@ export class ActualBudget implements INodeType {
 				default: { mode: 'list', value: '' },
 				required: true,
 				displayOptions: {
-					show: showForTransactionCreate,
+					show: showForTransactionCategoryExisting,
 				},
 				modes: [
 					{
@@ -193,7 +256,130 @@ export class ActualBudget implements INodeType {
 						placeholder: 'e.g. 9fa2550c-c3ff-498b-8df6-e0fbe2a62e0e',
 					},
 				],
-				description: 'Category ID for the transaction',
+				description: 'Category for the transaction',
+			},
+			{
+				displayName: 'New Category Name',
+				name: 'inlineCategoryName',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: 'e.g. Software subscriptions',
+				displayOptions: {
+					show: showForTransactionCategoryInlineCreate,
+				},
+				description: 'Name for the category created via POST /categories before the transaction',
+			},
+			{
+				displayName: 'New Category Group',
+				name: 'inlineCategoryGroup',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
+				required: true,
+				displayOptions: {
+					show: showForTransactionCategoryInlineCreate,
+				},
+				modes: [
+					{
+						displayName: 'Group',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a category group...',
+						typeOptions: {
+							searchListMethod: 'getCategoryGroups',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'By ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'Category group UUID',
+					},
+				],
+				description: 'Category group (required by actual-http-api when creating a category)',
+			},
+			{
+				displayName: 'New Category Is Income',
+				name: 'inlineCategoryIsIncome',
+				type: 'boolean',
+				displayOptions: {
+					show: showForTransactionCategoryInlineCreate,
+				},
+				default: false,
+				description: 'Whether the new category is an income category',
+			},
+			{
+				displayName: 'New Category Hidden',
+				name: 'inlineCategoryHidden',
+				type: 'boolean',
+				displayOptions: {
+					show: showForTransactionCategoryInlineCreate,
+				},
+				default: false,
+				description: 'Whether the new category starts hidden',
+			},
+			{
+				displayName: 'Category Name',
+				name: 'categoryCreateName',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: {
+					show: showForCategoryCreate,
+				},
+				description: 'Display name for the new category',
+			},
+			{
+				displayName: 'Category Group',
+				name: 'categoryCreateGroup',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
+				required: true,
+				displayOptions: {
+					show: showForCategoryCreate,
+				},
+				modes: [
+					{
+						displayName: 'Group',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a category group...',
+						typeOptions: {
+							searchListMethod: 'getCategoryGroups',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'By ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'Category group UUID',
+					},
+				],
+				description: 'Parent category group for the new category',
+			},
+			{
+				displayName: 'Is Income',
+				name: 'categoryCreateIsIncome',
+				type: 'boolean',
+				displayOptions: {
+					show: showForCategoryCreate,
+				},
+				default: false,
+				description: 'Whether this category is an income category',
+			},
+			{
+				displayName: 'Hidden',
+				name: 'categoryCreateHidden',
+				type: 'boolean',
+				displayOptions: {
+					show: showForCategoryCreate,
+				},
+				default: false,
+				description: 'Whether the category is hidden',
 			},
 			{
 				displayName: 'Amount',
@@ -281,6 +467,7 @@ export class ActualBudget implements INodeType {
 		listSearch: {
 			getAccounts,
 			getCategories,
+			getCategoryGroups,
 		},
 	};
 
@@ -296,9 +483,63 @@ export class ActualBudget implements INodeType {
 					const accountId = this.getNodeParameter('accountId', itemIndex, '', {
 						extractValue: true,
 					}) as string;
-					const categoryId = this.getNodeParameter('categoryId', itemIndex, '', {
-						extractValue: true,
-					}) as string;
+					const categorySource = this.getNodeParameter(
+						'categorySource',
+						itemIndex,
+						'existing',
+					) as string;
+
+					let categoryId: string;
+					let categoryCreateRequest: IDataObject | undefined;
+					let categoryCreateResponse: IDataObject | undefined;
+
+					if (categorySource === 'createNew') {
+						const newName = (this.getNodeParameter('inlineCategoryName', itemIndex) as string).trim();
+						if (!newName) {
+							throw new ApplicationError('New category name is required');
+						}
+						const groupId = this.getNodeParameter('inlineCategoryGroup', itemIndex, '', {
+							extractValue: true,
+						}) as string;
+						if (!groupId?.trim()) {
+							throw new ApplicationError('Category group is required to create a category');
+						}
+						const isIncome = this.getNodeParameter(
+							'inlineCategoryIsIncome',
+							itemIndex,
+							false,
+						) as boolean;
+						const hidden = this.getNodeParameter(
+							'inlineCategoryHidden',
+							itemIndex,
+							false,
+						) as boolean;
+
+						const categoryPayload: IDataObject = {
+							name: newName,
+							group_id: groupId.trim(),
+							is_income: isIncome,
+							hidden,
+						};
+						categoryCreateRequest = { category: categoryPayload };
+
+						categoryCreateResponse = (await actualApiRequest.call(
+							this,
+							'POST',
+							'/categories',
+							categoryCreateRequest,
+						)) as IDataObject;
+
+						categoryId = parseCreatedCategoryId(categoryCreateResponse);
+					} else {
+						categoryId = this.getNodeParameter('categoryId', itemIndex, '', {
+							extractValue: true,
+						}) as string;
+						if (!categoryId?.trim()) {
+							throw new ApplicationError('Category is required');
+						}
+					}
+
 					const amount = parseMinorUnitsAmount(this.getNodeParameter('amount', itemIndex) as number);
 					const date = this.getNodeParameter('date', itemIndex) as string;
 					const payeeName = this.getNodeParameter('payeeName', itemIndex) as string;
@@ -330,10 +571,64 @@ export class ActualBudget implements INodeType {
 						body,
 					)) as IDataObject;
 
+					const jsonOut: IDataObject = {
+						...responseData,
+						request: body,
+					};
+					if (categorySource === 'createNew' && categoryCreateRequest && categoryCreateResponse) {
+						jsonOut.categoryCreate = {
+							request: categoryCreateRequest,
+							response: categoryCreateResponse,
+							categoryId,
+						};
+					}
+
+					returnData.push({
+						json: jsonOut,
+						pairedItem: itemIndex,
+					});
+					continue;
+				}
+
+				if (action === 'categoryCreate') {
+					const name = (this.getNodeParameter('categoryCreateName', itemIndex) as string).trim();
+					if (!name) {
+						throw new ApplicationError('Category name is required');
+					}
+					const groupId = this.getNodeParameter('categoryCreateGroup', itemIndex, '', {
+						extractValue: true,
+					}) as string;
+					if (!groupId?.trim()) {
+						throw new ApplicationError('Category group is required');
+					}
+					const isIncome = this.getNodeParameter(
+						'categoryCreateIsIncome',
+						itemIndex,
+						false,
+					) as boolean;
+					const hidden = this.getNodeParameter('categoryCreateHidden', itemIndex, false) as boolean;
+
+					const createBody: IDataObject = {
+						category: {
+							name,
+							group_id: groupId.trim(),
+							is_income: isIncome,
+							hidden,
+						},
+					};
+
+					const responseData = (await actualApiRequest.call(
+						this,
+						'POST',
+						'/categories',
+						createBody,
+					)) as IDataObject;
+
 					returnData.push({
 						json: {
 							...responseData,
-							request: body,
+							request: createBody,
+							categoryId: parseCreatedCategoryId(responseData),
 						},
 						pairedItem: itemIndex,
 					});
@@ -428,6 +723,22 @@ async function getCategories(
 	const results: INodeListSearchItems[] = visible.map((category) => ({
 		name: category.name,
 		value: category.id,
+	}));
+
+	return { results: filterResults(results, filter) };
+}
+
+async function getCategoryGroups(
+	this: ILoadOptionsFunctions,
+	filter?: string,
+): Promise<INodeListSearchResult> {
+	const response = (await actualApiRequest.call(this, 'GET', '/categorygroups')) as ActualListResponse<
+		ActualCategoryGroup
+	>;
+	const visible = (response.data ?? []).filter((group) => !group.hidden);
+	const results: INodeListSearchItems[] = visible.map((group) => ({
+		name: group.name,
+		value: group.id,
 	}));
 
 	return { results: filterResults(results, filter) };

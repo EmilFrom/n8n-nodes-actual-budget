@@ -97,6 +97,17 @@ Request body matches the API: `learnCategories`, `runTransfers`, and `transactio
 
 `GET /budgets/{budgetSyncId}/categories` — returns the API response (including `data`).
 
+### Category: Create
+
+`POST /budgets/{budgetSyncId}/categories` with body `{ category: { name, group_id, is_income, hidden } }`. Pick a **category group** from the searchable list (same groups as in Actual). Response includes `data` (new category id); the node also exposes **`categoryId`** on the output item for convenience.
+
+### Transaction: Create — category UX
+
+Under **Transaction: Create**, **Category** controls how the category is chosen:
+
+- **Existing Category** — same as before: pick a category (list or UUID).
+- **Create New Category** — the node calls **POST /categories** with your name and group, reads the new id from the API response, then creates the transaction with that category. The execution output includes **`categoryCreate`** (request/response and resolved id) next to the transaction **`request`** / API response.
+
 ## Debugging (logs)
 
 This node uses n8n’s **`LoggerProxy`** from `n8n-workflow` (same approach as [n8n’s logging docs](https://docs.n8n.io/hosting/logging-monitoring/logging/)): each outbound call logs at **info** (method, resource, URL with the sync id redacted as `_syncId_`), extra hints at **debug**, and **warn** if the request fails (HTTP status when present; **404** entries may include a short `troubleshootingHint`). You do **not** need to add `/v1` manually when using a host-only Base URL — it is applied automatically.
