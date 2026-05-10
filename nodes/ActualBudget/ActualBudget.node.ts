@@ -48,6 +48,11 @@ const showForCategoryCreate = {
 	action: ['categoryCreate'],
 };
 
+/** GET /accounts/{id}/balance */
+const showForAccountBalance = {
+	action: ['accountGetBalance'],
+};
+
 /** Inline category creation inside Transaction: Create */
 const showForTransactionCategoryExisting = {
 	action: ['transactionCreate'],
@@ -120,7 +125,7 @@ export class ActualBudget implements INodeType {
 		version: 2,
 		subtitle: '={{$parameter["action"]}}',
 		description:
-			'Read budgets, list/create categories, and create transactions in Actual Budget via actual-http-api `/v1` routes (official endpoints)',
+			'Read budgets, list accounts and balances, list/create categories, and create transactions in Actual Budget via actual-http-api `/v1` routes (official endpoints)',
 		defaults: {
 			name: 'Actual Budget',
 		},
@@ -140,6 +145,12 @@ export class ActualBudget implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{
+						name: 'Account: Get Balance',
+						value: 'accountGetBalance',
+						action: 'Get account balance',
+						description: 'GET /accounts/{ID}/balance',
+					},
 					{
 						name: 'Account: List',
 						value: 'accountList',
@@ -205,7 +216,9 @@ export class ActualBudget implements INodeType {
 				default: { mode: 'list', value: '' },
 				required: true,
 				displayOptions: {
-					show: showForTransactionCreate,
+					show: {
+						action: ['transactionCreate', 'accountGetBalance'],
+					},
 				},
 				modes: [
 					{
@@ -226,7 +239,18 @@ export class ActualBudget implements INodeType {
 						placeholder: 'e.g. 729cb492-4eab-468b-9522-75d455cded22',
 					},
 				],
-				description: 'Account for the transaction',
+				description: 'Account for the transaction or balance query',
+			},
+			{
+				displayName: 'Balance Cutoff Date',
+				name: 'balanceCutoffDate',
+				type: 'dateTime',
+				displayOptions: {
+					show: showForAccountBalance,
+				},
+				default: '',
+				description:
+					'Optional `cutoff_date` query (YYYY-MM-DD); balance as of end of this day. Leave empty to use the server default (typically today per actual-http-api).',
 			},
 			{
 				displayName: 'Category',
@@ -672,6 +696,35 @@ export class ActualBudget implements INodeType {
 
 					returnData.push({
 						json: response as IDataObject,
+						pairedItem: itemIndex,
+					});
+					continue;
+				}
+
+				if (action === 'accountGetBalance') {
+					const accountId = this.getNodeParameter('accountId', itemIndex, '', {
+						extractValue: true,
+					}) as string;
+					if (!accountId?.trim()) {
+						throw new ApplicationError('Account is required');
+					}
+					const cutoffRaw = this.getNodeParameter('balanceCutoffDate', itemIndex, '') as string;
+					const qs: IDataObject = {};
+					if (String(cutoffRaw).trim()) {
+						qs.cutoff_date = parseActualDate(cutoffRaw);
+					}
+					const response = (await actualApiRequest.call(
+						this,
+						'GET',
+						`/accounts/${encodeURIComponent(accountId.trim())}/balance`,
+						undefined,
+						qs,
+					)) as IDataObject;
+					returnData.push({
+						json: {
+							...response,
+							...(Object.keys(qs).length > 0 ? { query: qs } : {}),
+						} as IDataObject,
 						pairedItem: itemIndex,
 					});
 					continue;

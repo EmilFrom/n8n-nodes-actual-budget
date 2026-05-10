@@ -94,6 +94,10 @@ Request body matches the API: `learnCategories`, `runTransfers`, and `transactio
 
 `GET /budgets/{budgetSyncId}/accounts` — returns the API response (including `data`).
 
+### Account: Get Balance
+
+`GET /budgets/{budgetSyncId}/accounts/{accountId}/balance` — returns `{ "data": <integer> }` in **minor units** (same as amounts elsewhere). Pick the **Account** from the list or by ID. **Balance Cutoff Date** is optional: maps to query `cutoff_date=YYYY-MM-DD` (balance as of that date). Leave it empty to rely on actual-http-api’s default (typically “today”).
+
 ### Category: List
 
 `GET /budgets/{budgetSyncId}/categories` — returns the API response (including `data`).
