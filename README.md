@@ -43,12 +43,20 @@ docker run -d --name actualhttpapi \
 
 Create an `Actual HTTP API` credential in n8n with:
 
-- `Base URL`: The actual-http-api base URL, for example `http://localhost:5007`
+- `Base URL`: Host (and optional path) where actual-http-api listens — for example `http://localhost:5007`, `http://actualhttpapi:5007`, or `http://localhost:5007/v1`. **Host-only URLs** (no path) automatically use the API root **`/v1`**, matching [actual-http-api OpenAPI](https://github.com/jhonderson/actual-http-api) defaults.
 - `API Key`: The `API_KEY` configured for actual-http-api
 - `Budget Sync ID`: The Sync ID from Actual Budget settings under advanced settings
 - `Budget Encryption Password`: Optional, only for encrypted budgets
 
-The credential test calls `GET /budgets/{budgetSyncId}/accounts`.
+The credential test calls `GET /v1/budgets/{budgetSyncId}/accounts` (or the same path under your custom base URL).
+
+### Troubleshooting
+
+| Symptom | What to check |
+|--------|----------------|
+| **404** on `/budgets/...` | **Budget Sync ID** must match the budget file on the Actual server that actual-http-api uses. Confirm with curl against the same host (routes live under **`/v1/budgets/...`**). |
+| **`ECONNREFUSED` to `::1` or `127.0.0.1`** | n8n runs in Docker: **`localhost` inside the container is not your host.** Use the container/service DNS name (e.g. `http://actualhttpapi:5007`) or the LAN IP n8n can reach. |
+| Works in curl but not in n8n | Same **Base URL** shape as curl (host/service name), same sync id and API key. See [Debugging (logs)](#debugging-logs). |
 
 ## Node version 2 (breaking change)
 
@@ -91,7 +99,7 @@ Request body matches the API: `learnCategories`, `runTransfers`, and `transactio
 
 ## Debugging (logs)
 
-This node uses n8n’s **`LoggerProxy`** from `n8n-workflow` (same approach as [n8n’s logging docs](https://docs.n8n.io/hosting/logging-monitoring/logging/)): each outbound call logs at **info** (method, resource, URL with the sync id redacted), extra hints at **debug**, and **warn** if the request fails (HTTP status when present).
+This node uses n8n’s **`LoggerProxy`** from `n8n-workflow` (same approach as [n8n’s logging docs](https://docs.n8n.io/hosting/logging-monitoring/logging/)): each outbound call logs at **info** (method, resource, URL with the sync id redacted as `_syncId_`), extra hints at **debug**, and **warn** if the request fails (HTTP status when present; **404** entries may include a short `troubleshootingHint`). You do **not** need to add `/v1` manually when using a host-only Base URL — it is applied automatically.
 
 **Where to read logs:** server stdout/stderr (Docker/Kubernetes logs) or the log file if you enable file output — not the workflow execution panel in the editor.
 

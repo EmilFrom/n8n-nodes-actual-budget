@@ -88,7 +88,7 @@ export class ActualBudget implements INodeType {
 		version: 2,
 		subtitle: '={{$parameter["action"]}}',
 		description:
-			'Read budgets and create transactions in Actual Budget via actual-http-api (official endpoints)',
+			'Read budgets and create transactions in Actual Budget via actual-http-api `/v1` routes (official endpoints)',
 		defaults: {
 			name: 'Actual Budget',
 		},

@@ -8,6 +8,7 @@ import type {
 	ILoadOptionsFunctions,
 } from 'n8n-workflow';
 import { LoggerProxy as Logger } from 'n8n-workflow';
+import { normalizeActualHttpApiBaseUrl } from './actualHttpApiRoot';
 
 type ActualCredentials = {
 	baseUrl: string;
@@ -21,22 +22,16 @@ type ActualRequestContext =
 	| ILoadOptionsFunctions;
 
 function buildUrl(credentials: ActualCredentials, resource: string) {
-	const baseUrl = credentials.baseUrl.replace(/\/+$/, '');
+	const apiRoot = normalizeActualHttpApiBaseUrl(credentials.baseUrl);
 	const budgetSyncId = encodeURIComponent(credentials.budgetSyncId);
 	const normalizedResource = resource.startsWith('/') ? resource : `/${resource}`;
 
-	return `${baseUrl}/budgets/${budgetSyncId}${normalizedResource}`;
+	return `${apiRoot}/budgets/${budgetSyncId}${normalizedResource}`;
 }
 
 /** Sync ID segment replaced so logs are safe to share (no secrets). */
 function redactBudgetSyncInUrl(url: string): string {
-	try {
-		const u = new URL(url);
-		u.pathname = u.pathname.replace(/\/budgets\/[^/]+/, '/budgets/<syncId>');
-		return u.toString();
-	} catch {
-		return '<invalid-url>';
-	}
+	return url.replace(/\/budgets\/[^/?#]+/, '/budgets/_syncId_');
 }
 
 export async function actualApiRequest(
@@ -57,7 +52,7 @@ export async function actualApiRequest(
 	};
 
 	const redactedUrl = redactBudgetSyncInUrl(options.url ?? '');
-	const baseTrim = credentials.baseUrl.replace(/\/+$/, '');
+	const normalizedRoot = normalizeActualHttpApiBaseUrl(credentials.baseUrl);
 
 	Logger.info('Actual Budget: HTTP request', {
 		nodeType: 'actualBudget',
@@ -71,7 +66,7 @@ export async function actualApiRequest(
 		method,
 		resource,
 		url: redactedUrl,
-		baseUrlEndsWithBudgetsPath: /\/budgets(\/|$)/i.test(baseTrim),
+		baseUrlEndsWithBudgetsPath: /\/budgets(\/|$)/i.test(normalizedRoot),
 		budgetSyncIdTrimLength: String(credentials.budgetSyncId ?? '').trim().length,
 	});
 
@@ -83,6 +78,10 @@ export async function actualApiRequest(
 			message?: string;
 			error?: unknown;
 		};
+		const troubleshootingHint =
+			err.statusCode === 404
+				? 'HTTP 404: verify Budget Sync ID matches Actual for this server; confirm actual-http-api uses /v1 routes; from Docker use service hostname not localhost.'
+				: undefined;
 		Logger.warn('Actual Budget: HTTP request failed', {
 			nodeType: 'actualBudget',
 			method,
@@ -90,6 +89,7 @@ export async function actualApiRequest(
 			url: redactedUrl,
 			statusCode: err.statusCode,
 			message: err.message,
+			...(troubleshootingHint ? { troubleshootingHint } : {}),
 		});
 		throw error;
 	}

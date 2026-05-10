@@ -6,6 +6,10 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
+/** Must stay aligned with normalizeActualHttpApiBaseUrl in nodes/ActualBudget/actualHttpApiRoot.ts */
+const credentialTestBaseUrlExpression =
+	'={{ (() => { const trimmed = $credentials.baseUrl.trim().replace(/\\/+$/, ""); try { const u = new URL(trimmed); let path = u.pathname.replace(/\\/+$/, ""); if (path === "") path = "/"; if (path === "/") { u.pathname = "/v1"; } else if (path.endsWith("/v1")) { u.pathname = path; } else { return trimmed; } return (u.origin + u.pathname).replace(/\\/+$/, ""); } catch { return trimmed; } })() }}';
+
 export class ActualHttpApi implements ICredentialType {
 	name = 'actualHttpApi';
 
@@ -24,9 +28,10 @@ export class ActualHttpApi implements ICredentialType {
 			name: 'baseUrl',
 			type: 'string',
 			default: 'http://localhost:5007',
-			placeholder: 'http://actual-http-api:5007',
+			placeholder: 'http://actual-http-api:5007/v1',
 			required: true,
-			description: 'Base URL of the actual-http-api service, without a trailing slash',
+			description:
+				'Root URL of actual-http-api (host and port). If you omit the path (e.g. http://myapi:5007), /v1 is added automatically. You may also set the full URL including /v1.',
 		},
 		{
 			displayName: 'API Key',
@@ -68,7 +73,7 @@ export class ActualHttpApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{$credentials.baseUrl.replace(/\\/+$/, "")}}',
+			baseURL: credentialTestBaseUrlExpression,
 			url: '=/budgets/{{$credentials.budgetSyncId}}/accounts',
 			method: 'GET',
 		},
