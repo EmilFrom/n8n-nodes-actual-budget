@@ -89,6 +89,22 @@ Request body matches the API: `learnCategories`, `runTransfers`, and `transactio
 
 `GET /budgets/{budgetSyncId}/categories` — returns the API response (including `data`).
 
+## Debugging (logs)
+
+This node uses n8n’s **`LoggerProxy`** from `n8n-workflow` (same approach as [n8n’s logging docs](https://docs.n8n.io/hosting/logging-monitoring/logging/)): each outbound call logs at **info** (method, resource, URL with the sync id redacted), extra hints at **debug**, and **warn** if the request fails (HTTP status when present).
+
+**Where to read logs:** server stdout/stderr (Docker/Kubernetes logs) or the log file if you enable file output — not the workflow execution panel in the editor.
+
+**Environment variables** (optional; defaults are usually enough until you need more detail):
+
+| Variable | Typical value | Purpose |
+|----------|-----------------|--------|
+| `N8N_LOG_LEVEL` | `info` (default) | Use **`debug`** to include `Logger.debug` lines (credential-shape hints). |
+| `N8N_LOG_OUTPUT` | `console` (default) | Use `console,file` and set `N8N_LOG_FILE_LOCATION` if you want a persistent log file. |
+| `N8N_LOG_FILE_LOCATION` | e.g. `/home/node/.n8n/logs/n8n.log` | Path when `N8N_LOG_OUTPUT` includes `file`. |
+
+After changing env vars, restart n8n.
+
 ## Development
 
 ```bash
