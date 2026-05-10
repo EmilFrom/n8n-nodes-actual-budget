@@ -419,6 +419,20 @@ export class ActualBudget implements INodeType {
 				description: 'Payee label for the transaction',
 			},
 			{
+				displayName: 'Notes',
+				name: 'transactionNotes',
+				type: 'string',
+				displayOptions: {
+					show: showForTransactionCreate,
+				},
+				default: '',
+				typeOptions: {
+					rows: 4,
+				},
+				description:
+					'Optional memo on the transaction; sent as `transaction.notes` in the API body when non-empty',
+			},
+			{
 				displayName: 'Cleared',
 				name: 'cleared',
 				type: 'boolean',
@@ -550,18 +564,26 @@ export class ActualBudget implements INodeType {
 						false,
 					) as boolean;
 					const runTransfers = this.getNodeParameter('runTransfers', itemIndex, false) as boolean;
+					const transactionNotes = (
+						this.getNodeParameter('transactionNotes', itemIndex, '') as string
+					).trim();
+
+					const transactionPayload: IDataObject = {
+						account: accountId,
+						category: categoryId,
+						amount,
+						payee_name: payeeName,
+						date: parseActualDate(date),
+						cleared,
+					};
+					if (transactionNotes) {
+						transactionPayload.notes = transactionNotes;
+					}
 
 					const body: IDataObject = {
 						learnCategories,
 						runTransfers,
-						transaction: {
-							account: accountId,
-							category: categoryId,
-							amount,
-							payee_name: payeeName,
-							date: parseActualDate(date),
-							cleared,
-						},
+						transaction: transactionPayload,
 					};
 
 					const responseData = (await actualApiRequest.call(

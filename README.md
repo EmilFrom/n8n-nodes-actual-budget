@@ -76,12 +76,13 @@ Creates one transaction per input item using the official single-create endpoint
 `POST /budgets/{budgetSyncId}/accounts/{accountId}/transactions`
 
 Request body matches the API: `learnCategories`, `runTransfers`, and `transaction` with
-`account`, `category`, `amount`, `payee_name`, `date`, `cleared` only.
+`account`, `category`, `amount`, `payee_name`, `date`, `cleared`, and optionally `notes`.
 
 - **Account** / **Category**: selectable lists from `GET /accounts` and `GET /categories`
 - **Amount**: integer minor units (for example `-7374` for `-73.74` in a two-decimal currency)
 - **Date**: stored as `YYYY-MM-DD`
 - **Payee Name**: plain text (for example `Amazon`)
+- **Notes**: optional; when non-empty, sent as `transaction.notes` (memo on the transaction)
 - **Cleared**, **Learn Categories**, **Run Transfers**: booleans
 
 ### Budget: Get Month
